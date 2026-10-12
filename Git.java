@@ -231,7 +231,7 @@ class Git {
             }
             working.append("tree " + treeHash + " " + deepest);
             workingList = working.toString();
-    
+
         }
         return createTree(workingList, "");
     }
@@ -252,4 +252,9 @@ class Git {
         return deepestName;
     }
 
+}
+
+public static void commit() throws IOException {
+
+    File commit = new file("git/objects/" + hash);
 }
