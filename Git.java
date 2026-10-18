@@ -10,6 +10,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.List;
+import java.time.LocalDateTime;
+import java.nio.file.StandardCopyOption;
 
 class Git {
     public static void main(String[] args) {
@@ -252,9 +254,39 @@ class Git {
         return deepestName;
     }
 
-}
+    public static String commit(String author, String message)
+            throws IOException, NoSuchAlgorithmException {
 
-public static void commit() throws IOException {
+        String treeHash = createTrees();
+        String parentHash = Files.readString(Path.of("git/HEAD")).trim();
+        StringBuilder commitText = new StringBuilder();
+        commitText.append("tree: " + treeHash + "\n");
 
-    File commit = new file("git/objects/" + hash);
+        if (!parentHash.isEmpty()) {
+            commitText.append("parent: " + parentHash + "\n");
+        }
+
+        commitText.append("author: " + author + "\n");
+        commitText.append("date: " + LocalDateTime.now() + "\n");
+        commitText.append("message: " + message);
+
+        MessageDigest digest = MessageDigest.getInstance("SHA-1");
+        byte[] hash = digest.digest(commitText.toString().getBytes());
+        String commitHash = HexFormat.of().formatHex(hash);
+
+        File commitFile = new File("git/objects/" + commitHash);
+        FileWriter fw = new FileWriter(commitFile);
+        fw.write(commitText.toString());
+        fw.close();
+
+        Path tempHead = Path.of("git/HEAD.tmp");
+        FileWriter wr = new FileWriter("git/HEAD.tmp");
+        wr.write(commitHash);
+        wr.close();
+
+        Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"), StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+
+        return commitHash;
+    }
 }
