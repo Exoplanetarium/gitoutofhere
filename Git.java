@@ -289,4 +289,28 @@ class Git {
 
         return commitHash;
     }
+
+    public static void regenerateIndex() throws IOException, NoSuchAlgorithmException {
+        regenerateIndexHelper(createTrees());
+    }
+
+    public static void regenerateIndexHelper(String treeHash) throws IOException {
+        StringBuilder str = new StringBuilder();
+        List<String> objects = Files.readAllLines(Path.of("git/objects/"));
+        for (String line : objects) {
+            String[] parts = line.split(" ");
+            if (parts[0].equals("blob")) {
+                str.append(parts[1] + " " + parts[2]);
+            } else if (parts[0].equals("tree")) {
+                regenerateIndexHelper(parts[1]);
+            }
+        }
+        Path tempIndex = Path.of("git/index.tmp");
+        FileWriter wr = new FileWriter("git/index.tmp");
+        wr.write(str.toString());
+        wr.close();
+
+        Files.move(Path.of("git/index.tmp"), Path.of("git/index"), StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+    }
 }
