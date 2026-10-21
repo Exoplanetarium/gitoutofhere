@@ -23,15 +23,17 @@ class Git {
             createBlob(test.getPath());
             addToIndex(test.getPath());
 
-            File testFolder = new File("testing/test.txt");
-            testFolder.createNewFile();
-            System.out.println(hash(testFolder.getPath()));
-            createBlob(testFolder.getPath());
-            addToIndex(testFolder.getPath());
-            addToIndex(testFolder.getPath());
-
-            String tester = createTrees();
-            System.out.println(tester);
+            // File testFolder0 = new File("testing");
+            // testFolder0.mkdir();
+            // File testFolder = new File("testing/test2.txt");
+            // testFolder.createNewFile();
+            // System.out.println(hash(testFolder.getPath()));
+            // createBlob(testFolder.getPath());
+            // addToIndex(testFolder.getPath());
+            // addToIndex(testFolder.getPath());
+            //commit("me", "Commit B");
+            GitWrapper gitWrapper = new GitWrapper();
+            gitWrapper.checkout("08be1953f397ccd5e7e36eb86fd6f5095b339449");
         } catch (IOException e) {
             return;
         } catch (NoSuchAlgorithmException e) {

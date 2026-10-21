@@ -8,3 +8,5 @@ createTree() - creates a tree for the given directory from the working list and 
 createWorkingList() - creates a working list by adding blobs in front of index entries
 createTrees() - creates trees for each folder and its contents until there is only one tree left
 findDeepest() - finds and returns the deepest folder in the working list
+
+no bugs ty xander
