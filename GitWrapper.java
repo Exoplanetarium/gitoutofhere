@@ -1,3 +1,7 @@
+import java.io.IOException;
+import java.io.File;
+import java.security.NoSuchAlgorithmException;
+
 public class GitWrapper {
 
     /**
@@ -5,8 +9,9 @@ public class GitWrapper {
      * This method creates the necessary directory structure
      * and initial files (index, HEAD) required for a Git repository.
      */
-    public void init() {
+    public void init() throws IOException {
         // to-do: implement functionality here
+        Git.init();
     }
 
     /**
@@ -16,15 +21,22 @@ public class GitWrapper {
      * If the file is a directory, it throws an IOException.
      * If the file is already in the index, it does nothing.
      * If the file is successfully staged, it creates a blob for the file.
+     * 
      * @param filePath The path to the file to be staged.
      */
-    public void add(String filePath) {
+    public void add(String filePath) throws IOException {
         // to-do: implement functionality here
+        if (!new File(filePath).isFile()) {
+            throw new IOException();
+        }
+        Git.createBlob(filePath);
+        Git.addToIndex(filePath);
     }
 
     /**
      * Creates a commit with the given author and message.
-     * It should capture the current state of the repository by building trees based on the index file,
+     * It should capture the current state of the repository by building trees based
+     * on the index file,
      * writing the tree to the objects directory,
      * writing the commit to the objects directory,
      * updating the HEAD file,
@@ -41,9 +53,8 @@ public class GitWrapper {
      * @param message The commit message describing the changes.
      * @return The SHA1 hash of the new commit.
      */
-    public String commit(String author, String message) {
-        // to-do: implement functionality here
-        return "";
+    public String commit(String author, String message) throws IOException, NoSuchAlgorithmException {
+        return Git.commit(author, message);
     }
 
     /**
