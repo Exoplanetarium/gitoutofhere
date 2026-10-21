@@ -286,7 +286,6 @@ class Git {
         fw.write(commitText.toString());
         fw.close();
 
-        Path tempHead = Path.of("git/HEAD.tmp");
         FileWriter wr = new FileWriter("git/HEAD.tmp");
         wr.write(commitHash);
         wr.close();
@@ -297,13 +296,25 @@ class Git {
         return commitHash;
     }
 
+    public static void regenerateIndex(String commitHash) throws IOException, NoSuchAlgorithmException {
+        List<String> commitLines = Files.readAllLines(Path.of("git/objects/" + commitHash));
+        String treeHash = commitLines.get(0).substring(6);
+        StringBuilder str = new StringBuilder();
+        regenerateIndexHelper(treeHash, "", str);
+        FileWriter wr = new FileWriter("git/index.tmp");
+        wr.write(str.toString());
+        wr.close();
+
+        Files.move(Path.of("git/index.tmp"), Path.of("git/index"), StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+    }
+
     public static void regenerateIndex() throws IOException, NoSuchAlgorithmException {
         String commitHash = Files.readString(Path.of("git/HEAD")).trim();
         List<String> commitLines = Files.readAllLines(Path.of("git/objects/" + commitHash));
         String treeHash = commitLines.get(0).substring(6);
         StringBuilder str = new StringBuilder();
         regenerateIndexHelper(treeHash, "", str);
-        Path tempIndex = Path.of("git/index.tmp");
         FileWriter wr = new FileWriter("git/index.tmp");
         wr.write(str.toString());
         wr.close();
@@ -324,5 +335,4 @@ class Git {
         }
     }
 
-    
 }

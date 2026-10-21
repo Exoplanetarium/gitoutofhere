@@ -1,6 +1,11 @@
 import java.io.IOException;
 import java.io.File;
 import java.security.NoSuchAlgorithmException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.io.FileWriter;
+import java.nio.file.StandardCopyOption;
 
 public class GitWrapper {
 
@@ -66,7 +71,49 @@ public class GitWrapper {
      *
      * @param commitHash The SHA1 hash of the commit to check out.
      */
-    public void checkout(String commitHash) {
+    public void checkout(String commitHash) throws IOException, NoSuchAlgorithmException {
         // to-do: implement functionality here
+        List<String> oldIndex = Files.readAllLines(Path.of("git/index"));
+        Git.regenerateIndex(commitHash);
+        List<String> newIndex = Files.readAllLines(Path.of("git/index"));
+
+        for (String oldLine : oldIndex) {
+            String oldPath = oldLine.split(" ", 2)[1];
+            boolean found = false;
+            for (String newLine : newIndex) {
+                String newPath = newLine.split(" ", 2)[1];
+                if (oldPath.equals(newPath)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Files.delete(Path.of(oldPath));
+                File folder = new File(oldPath).getParentFile();
+                while (folder != null && folder.isDirectory() && folder.delete()) {
+                    folder = folder.getParentFile();
+                }
+            }
+        }
+        for (String newLine : newIndex) {
+            String[] parts = newLine.split(" ", 2);
+            String blobHash = parts[0];
+            String filePath = parts[1];
+            String contents = Files.readString(Path.of("git/objects/" + blobHash));
+            Path file = Path.of(filePath);
+            Path parent = file.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            FileWriter wr = new FileWriter(filePath);
+            wr.write(contents);
+            wr.close();
+        }
+        FileWriter wr = new FileWriter("git/HEAD.tmp");
+        wr.write(commitHash);
+        wr.close();
+        Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
     }
 }
