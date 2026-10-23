@@ -381,6 +381,17 @@ class Git {
         return false;
     }
 
+    public static boolean isExistingBranch(String str) {
+        File branches = new File("git/refs/heads");
+        for (String branch : branches.list()) {
+            if (branch.equals(str)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static void checkoutFromRef(String branchName) throws IOException, NoSuchAlgorithmException {
         File branch = new File("git/refs/heads/" + branchName);
         if (!branch.exists()) {

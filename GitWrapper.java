@@ -75,8 +75,16 @@ public class GitWrapper {
         // to-do: implement functionality here
         if (Git.isCommitHash(commitHash)) {
             Git.checkoutFromCommit(commitHash);
-        } else {
+        } else if (Git.isExistingBranch(commitHash)){
             Git.checkoutFromRef(commitHash);
+        } else {
+            createBranch(commitHash);
+            FileWriter wr = new FileWriter("git/HEAD.tmp");
+            wr.write("ref: refs/heads/" + commitHash);
+            wr.close();
+            Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
