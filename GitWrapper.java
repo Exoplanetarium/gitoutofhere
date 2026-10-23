@@ -73,47 +73,44 @@ public class GitWrapper {
      */
     public void checkout(String commitHash) throws IOException, NoSuchAlgorithmException {
         // to-do: implement functionality here
-        List<String> oldIndex = Files.readAllLines(Path.of("git/index"));
-        Git.regenerateIndex(commitHash);
-        List<String> newIndex = Files.readAllLines(Path.of("git/index"));
-
-        for (String oldLine : oldIndex) {
-            String oldPath = oldLine.split(" ", 2)[1];
-            boolean found = false;
-            for (String newLine : newIndex) {
-                String newPath = newLine.split(" ", 2)[1];
-                if (oldPath.equals(newPath)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                Files.delete(Path.of(oldPath));
-                File folder = new File(oldPath).getParentFile();
-                while (folder != null && folder.isDirectory() && folder.delete()) {
-                    folder = folder.getParentFile();
-                }
-            }
-        }
-        for (String newLine : newIndex) {
-            String[] parts = newLine.split(" ", 2);
-            String blobHash = parts[0];
-            String filePath = parts[1];
-            String contents = Files.readString(Path.of("git/objects/" + blobHash));
-            Path file = Path.of(filePath);
-            Path parent = file.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            FileWriter wr = new FileWriter(filePath);
-            wr.write(contents);
+        if (Git.isCommitHash(commitHash)) {
+            Git.checkoutFromCommit(commitHash);
+        } else if (Git.isExistingBranch(commitHash)){
+            Git.checkoutFromRef(commitHash);
+        } else {
+            createBranch(commitHash);
+            FileWriter wr = new FileWriter("git/HEAD.tmp");
+            wr.write("ref: refs/heads/" + commitHash);
             wr.close();
+            Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"),
+                    StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
         }
-        FileWriter wr = new FileWriter("git/HEAD.tmp");
-        wr.write(commitHash);
-        wr.close();
-        Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"),
-                StandardCopyOption.ATOMIC_MOVE,
-                StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    public void createBranch(String branchName) {
+        try {
+            String headContent = Files.readString(Path.of("git/HEAD")).trim();
+            String commitHash = "";
+            File branch = new File("git/refs/heads/" + branchName);
+            if (branch.createNewFile() == false) {
+                throw new IOException();
+            }
+
+            if (headContent.split(" ")[0].equals("ref:")) {
+                String currentBranch = headContent.split(" ")[1];
+                commitHash = Files.readString(Path.of("git/" + currentBranch)).trim();
+                FileWriter branchWriter = new FileWriter(branch.getPath());
+                branchWriter.write(commitHash);
+                branchWriter.close();
+            } else {
+                commitHash = headContent;
+                FileWriter branchWriter = new FileWriter(branch.getPath());
+                branchWriter.write(commitHash);
+                branchWriter.close();
+            }
+        } catch (IOException e) {
+            return;
+        }
     }
 }

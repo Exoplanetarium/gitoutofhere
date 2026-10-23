@@ -16,13 +16,14 @@ import java.nio.file.StandardCopyOption;
 class Git {
     public static void main(String[] args) {
         try {
-            init();
+            // init();
+            GitWrapper gitWrapper = new GitWrapper();
             File test = new File("test.txt");
             test.createNewFile();
             System.out.println(hash(test.getPath()));
-            createBlob(test.getPath());
-            addToIndex(test.getPath());
-
+            //gitWrapper.add("test.txt");
+            //gitWrapper.commit("Me", "Feature Commit A");
+            gitWrapper.checkout("feature");
             // File testFolder0 = new File("testing");
             // testFolder0.mkdir();
             // File testFolder = new File("testing/test2.txt");
@@ -32,8 +33,8 @@ class Git {
             // addToIndex(testFolder.getPath());
             // addToIndex(testFolder.getPath());
             //commit("me", "Commit B");
-            GitWrapper gitWrapper = new GitWrapper();
-            gitWrapper.checkout("08be1953f397ccd5e7e36eb86fd6f5095b339449");
+            // GitWrapper gitWrapper = new GitWrapper();
+            // gitWrapper.checkout("08be1953f397ccd5e7e36eb86fd6f5095b339449");
         } catch (IOException e) {
             return;
         } catch (NoSuchAlgorithmException e) {
@@ -44,6 +45,8 @@ class Git {
     public static void init() throws IOException {
         File git = new File("git");
         File objects = new File("git/objects");
+        File refs = new File("git/refs");
+        File heads = new File("git/refs/heads");
 
         boolean doesEverythingExist = true;
 
@@ -56,6 +59,14 @@ class Git {
             doesEverythingExist = false;
         }
 
+        if (refs.mkdir() == true) {
+            doesEverythingExist = false;
+        }
+
+        if (heads.mkdir() == true) {
+            doesEverythingExist = false;
+        }
+
         File index = new File("git/index");
         File head = new File("git/HEAD");
 
@@ -65,7 +76,11 @@ class Git {
 
         if (head.createNewFile() == true) {
             doesEverythingExist = false;
-        }
+        } 
+        
+        FileWriter headInit = new FileWriter("git/HEAD");
+        headInit.write("ref: refs/heads/main");
+        headInit.close();
 
         if (doesEverythingExist == true) {
             System.out.println("Git Repository Already Exists");
@@ -267,7 +282,16 @@ class Git {
             throws IOException, NoSuchAlgorithmException {
 
         String treeHash = createTrees();
-        String parentHash = Files.readString(Path.of("git/HEAD")).trim();
+        String parentHash = "";
+        String[] headContent = Files.readString(Path.of("git/HEAD")).trim().split(" ");
+        if (headContent[0].equals("ref:")) {
+            File currentBranch = new File("git/" + headContent[1]);
+            currentBranch.createNewFile();
+            parentHash = Files.readString(Path.of("git/" + headContent[1])).trim();
+        } else {
+            parentHash = Files.readString(Path.of("git/HEAD")).trim();
+        }
+
         StringBuilder commitText = new StringBuilder();
         commitText.append("tree: " + treeHash + "\n");
 
@@ -288,12 +312,17 @@ class Git {
         fw.write(commitText.toString());
         fw.close();
 
-        FileWriter wr = new FileWriter("git/HEAD.tmp");
-        wr.write(commitHash);
-        wr.close();
-
-        Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"), StandardCopyOption.ATOMIC_MOVE,
+        if (headContent[0].equals("ref:")) {
+            FileWriter wr = new FileWriter("git/" + headContent[1]);
+            wr.write(commitHash);
+            wr.close();
+        } else {
+            FileWriter wr = new FileWriter("git/HEAD.tmp");
+            wr.write(commitHash);
+            wr.close();
+            Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"), StandardCopyOption.ATOMIC_MOVE,
                 StandardCopyOption.REPLACE_EXISTING);
+        }
 
         return commitHash;
     }
@@ -304,7 +333,7 @@ class Git {
         StringBuilder str = new StringBuilder();
         regenerateIndexHelper(treeHash, "", str);
         FileWriter wr = new FileWriter("git/index.tmp");
-        wr.write(str.toString());
+        wr.write(str.toString().substring(0, str.length() - 1));
         wr.close();
 
         Files.move(Path.of("git/index.tmp"), Path.of("git/index"), StandardCopyOption.ATOMIC_MOVE,
@@ -318,7 +347,7 @@ class Git {
         StringBuilder str = new StringBuilder();
         regenerateIndexHelper(treeHash, "", str);
         FileWriter wr = new FileWriter("git/index.tmp");
-        wr.write(str.toString());
+        wr.write(str.toString().substring(0, str.length() - 1));
         wr.close();
 
         Files.move(Path.of("git/index.tmp"), Path.of("git/index"), StandardCopyOption.ATOMIC_MOVE,
@@ -337,4 +366,125 @@ class Git {
         }
     }
 
+    public static boolean isCommitHash(String str) {
+        if (str.length() != 48) {
+            return false;
+        }
+
+        File objects = new File("git/objects");
+        for (String blob : objects.list()) {
+            if (blob.equals(str)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static boolean isExistingBranch(String str) {
+        File branches = new File("git/refs/heads");
+        for (String branch : branches.list()) {
+            if (branch.equals(str)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static void checkoutFromRef(String branchName) throws IOException, NoSuchAlgorithmException {
+        File branch = new File("git/refs/heads/" + branchName);
+        if (!branch.exists()) {
+            throw new IOException();
+        }
+
+        String commitHash = Files.readString(Path.of("git/refs/heads/" + branchName));
+        List<String> oldIndex = Files.readAllLines(Path.of("git/index"));
+        regenerateIndex(commitHash);
+        List<String> newIndex = Files.readAllLines(Path.of("git/index"));
+
+        for (String oldLine : oldIndex) {
+            String oldPath = oldLine.split(" ", 2)[1];
+            boolean found = false;
+            for (String newLine : newIndex) {
+                String newPath = newLine.split(" ", 2)[1];
+                if (oldPath.equals(newPath)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Files.delete(Path.of(oldPath));
+                File folder = new File(oldPath).getParentFile();
+                while (folder != null && folder.isDirectory() && folder.delete()) {
+                    folder = folder.getParentFile();
+                }
+            }
+        }
+        for (String newLine : newIndex) {
+            String[] parts = newLine.split(" ", 2);
+            String blobHash = parts[0];
+            String filePath = parts[1];
+            String contents = Files.readString(Path.of("git/objects/" + blobHash));
+            Path file = Path.of(filePath);
+            Path parent = file.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            FileWriter wr = new FileWriter(filePath);
+            wr.write(contents);
+            wr.close();
+        }
+        FileWriter wr = new FileWriter("git/HEAD.tmp");
+        wr.write("ref: refs/heads/" + branchName);
+        wr.close();
+        Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    public static void checkoutFromCommit(String commitHash) throws IOException, NoSuchAlgorithmException {
+        List<String> oldIndex = Files.readAllLines(Path.of("git/index"));
+        regenerateIndex(commitHash);
+        List<String> newIndex = Files.readAllLines(Path.of("git/index"));
+
+        for (String oldLine : oldIndex) {
+            String oldPath = oldLine.split(" ", 2)[1];
+            boolean found = false;
+            for (String newLine : newIndex) {
+                String newPath = newLine.split(" ", 2)[1];
+                if (oldPath.equals(newPath)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                Files.delete(Path.of(oldPath));
+                File folder = new File(oldPath).getParentFile();
+                while (folder != null && folder.isDirectory() && folder.delete()) {
+                    folder = folder.getParentFile();
+                }
+            }
+        }
+        for (String newLine : newIndex) {
+            String[] parts = newLine.split(" ", 2);
+            String blobHash = parts[0];
+            String filePath = parts[1];
+            String contents = Files.readString(Path.of("git/objects/" + blobHash));
+            Path file = Path.of(filePath);
+            Path parent = file.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            FileWriter wr = new FileWriter(filePath);
+            wr.write(contents);
+            wr.close();
+        }
+        FileWriter wr = new FileWriter("git/HEAD.tmp");
+        wr.write(commitHash);
+        wr.close();
+        Files.move(Path.of("git/HEAD.tmp"), Path.of("git/HEAD"),
+                StandardCopyOption.ATOMIC_MOVE,
+                StandardCopyOption.REPLACE_EXISTING);
+    }
 }
